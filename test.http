@@ -1,0 +1,20 @@
+@token = eyJraWQiOiJvdldUQ0tLN1VQV2x1Wkl4d01xYXdZVkJub09pZzlSTTdJam1PK3orZlcwPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI3NDA4ZTRjOC1mMDQxLTcwMmYtOWVmNi00ZTM2MDFlOWY5ZGMiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsImlzcyI6Imh0dHBzOlwvXC9jb2duaXRvLWlkcC51cy1lYXN0LTEuYW1hem9uYXdzLmNvbVwvdXMtZWFzdC0xX2tubTEzcmNsTiIsImNvZ25pdG86dXNlcm5hbWUiOiJ0ZXN0QGRheWZsb3cuY29tIiwib3JpZ2luX2p0aSI6IjRhZTY2Y2I1LWFiOWMtNDk5NS04YjhmLTM4NjgwODYwNjgwNyIsImF1ZCI6IjdwaWxtaGJqaTZxaDdqdmo2MTNubmdkMnE2IiwiZXZlbnRfaWQiOiI0MTUzYTdkZS04ZGFhLTQyMTMtYjhhZS0yYWYwNTg5YjY5ZDMiLCJ0b2tlbl91c2UiOiJpZCIsImF1dGhfdGltZSI6MTc3ODI2NTI2OSwiZXhwIjoxNzc4MjY4ODY5LCJpYXQiOjE3NzgyNjUyNjksImp0aSI6ImE2ZmExYmEzLTI3NTMtNDJjNS04ZGExLWI0YjJmOWU4YTc4NiIsImVtYWlsIjoidGVzdEBkYXlmbG93LmNvbSJ9.dceCFOSPI89WjTK89iufuqzOPgTWCl5l40FXhbYFsTqkPUCGxt2vNTWlIJoELfQbSi4Ejy0iyggXKP2XnkwEyWDCQVIZJuGEyiiR-a60U4y87vg8R7XKEwWi7LEWxDcflddXRMoV_K-ErOnGwTDOMszXWMNxy5HVUQkwtP_A_N7_OyHRktjGuqCK466Kx89VYIk6Pj19vrrJwDVYOK2MyFo90Dw5fSCOsh181vkHcI2HvKrmjriWlzplAoNdCc65mT6daHonCuEHILlwZe-hcIGMpFjiys84qhx1QtgqKagU0k8iCV4D56eEFLBUGHgRx0x3QrrS-3GmvJIc9h17cg
+
+### Create an Event
+POST http://127.0.0.1:5000/events/
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "title": "Team Standup",
+    "datetime": "2026-05-08T09:00:00",
+    "category": "work"
+}
+
+### Get All Events
+GET http://127.0.0.1:5000/events/
+Authorization: Bearer {{token}}
+
+### Get Today's Briefing
+GET http://127.0.0.1:5000/briefing/today?city=Washington DC
+Authorization: Bearer {{token}}

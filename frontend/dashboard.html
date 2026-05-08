@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DayFlow AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f2ede4;
+            color: #1a1208;
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+        body.dark { background: #1a1208; color: #f0e6d6; }
+
+        /* NAV */
+        nav {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.25rem 0.75rem;
+            background: #f2ede4;
+            position: sticky; top: 0; z-index: 10;
+        }
+        body.dark nav { background: #1a1208; }
+        .nav-logo { display: flex; align-items: center; gap: 0.6rem; }
+        .nav-logo-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            border: 2px solid #c87941;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem; color: #c87941;
+        }
+        .nav-logo-text { font-size: 1.15rem; font-weight: 600; color: #1a1208; }
+        body.dark .nav-logo-text { color: #f0e6d6; }
+        .nav-logo-text span { color: #c87941; }
+        .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+        .nav-icon-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 0.5px solid #d4c4a8;
+            background: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; color: #5a4a32;
+        }
+        body.dark .nav-icon-btn { border-color: #3a2a18; color: #c8a878; }
+        .theme-btn {
+            background: none; border: 0.5px solid #d4c4a8;
+            border-radius: 8px; padding: 0.25rem 0.6rem;
+            font-size: 0.75rem; color: #7a6652; cursor: pointer;
+        }
+        body.dark .theme-btn { border-color: #3a2a18; color: #9e8a77; }
+
+        /* CONTAINER */
+        .container { max-width: 480px; margin: 0 auto; padding: 1rem 1.25rem 100px; }
+
+        /* GREETING */
+        .greeting { margin-bottom: 1.25rem; }
+        .greeting h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.3px; }
+        .greeting p  { font-size: 0.85rem; color: #7a6652; margin-top: 3px; }
+        body.dark .greeting p { color: #9e8a77; }
+
+        /* FOCUS CARD */
+        .focus-card {
+            border-radius: 18px; padding: 1.1rem 1.25rem;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1.25rem;
+            background: #2d2416;
+        }
+        body.dark .focus-card { background: #d4c4a0; }
+        .focus-left { display: flex; align-items: center; gap: 0.85rem; }
+        .focus-icon {
+            width: 40px; height: 40px; border-radius: 12px;
+            background: rgba(200,121,65,0.25);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+        }
+        .focus-meta { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.8px; color: #c87941; margin-bottom: 3px; }
+        .focus-title { font-size: 1rem; font-weight: 600; color: #f0e6d6; }
+        body.dark .focus-title { color: #2d2416; }
+        .focus-priority { font-size: 0.75rem; color: #c87941; margin-top: 2px; }
+        .progress-circle {
+            width: 44px; height: 44px; position: relative;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .progress-circle svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
+        .progress-circle span { font-size: 0.72rem; font-weight: 600; color: #c87941; z-index: 1; }
+
+        /* QUICK ACTIONS */
+        .quick-actions { display: flex; gap: 0.6rem; margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 2px; }
+        .qa-item {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 5px; flex-shrink: 0; cursor: pointer;
+            background: #ece4d4; border-radius: 14px;
+            padding: 0.65rem 0.85rem; min-width: 68px;
+            border: 0.5px solid #d8cbb4;
+            transition: background 0.2s;
+        }
+        body.dark .qa-item { background: #2a1e10; border-color: #3a2a18; }
+        .qa-item.active { background: #c87941; border-color: #c87941; }
+        .qa-icon { font-size: 1.1rem; }
+        .qa-label { font-size: 0.68rem; font-weight: 500; color: #5a4a32; }
+        body.dark .qa-label { color: #c8a878; }
+        .qa-item.active .qa-label { color: white; }
+
+        /* SECTION HEADER */
+        .section-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.6rem;
+        }
+        .section-title { font-size: 1rem; font-weight: 700; }
+        .view-all { font-size: 0.8rem; color: #c87941; cursor: pointer; }
+
+        /* ADD FORM */
+        .form-card {
+            background: #ece4d4; border: 0.5px solid #d4c4a8;
+            border-radius: 14px; padding: 1rem 1.1rem;
+            margin-bottom: 0.75rem; display: none;
+        }
+        body.dark .form-card { background: #2a1e10; border-color: #3a2a18; }
+        .form-card.open { display: block; }
+        .form-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+        .form-row input, .form-row select {
+            flex: 1; min-width: 130px;
+            padding: 0.6rem 0.85rem;
+            background: #f2ede4; border: 0.5px solid #c4a882;
+            border-radius: 8px; color: #1a1208;
+            font-size: 0.85rem; outline: none;
+        }
+        body.dark .form-row input, body.dark .form-row select {
+            background: #1a1208; border-color: #3a2a18; color: #f0e6d6;
+        }
+        .form-row input:focus, .form-row select:focus { border-color: #c87941; }
+        .save-btn {
+            margin-top: 0.65rem; padding: 0.55rem 1.2rem;
+            background: #c87941; border: none; border-radius: 8px;
+            color: white; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+        }
+
+        /* EVENT ROWS */
+        .event-row {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.85rem 0;
+            border-bottom: 0.5px solid #e0d4c0;
+        }
+        body.dark .event-row { border-color: #2a1e10; }
+        .event-time { font-size: 0.75rem; color: #8a7260; width: 60px; flex-shrink: 0; }
+        body.dark .event-time { color: #9e8a77; }
+        .event-icon-wrap {
+            width: 26px; height: 26px; border-radius: 7px;
+            background: #ece4d4;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; flex-shrink: 0;
+        }
+        body.dark .event-icon-wrap { background: #2a1e10; }
+        .event-name { font-size: 0.9rem; font-weight: 500; flex: 1; }
+        .event-check {
+            width: 18px; height: 18px; border-radius: 50%;
+            border: 1.5px solid #c4a882; flex-shrink: 0; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        body.dark .event-check { border-color: #4a3520; }
+        .event-check.done { background: #c87941; border-color: #c87941; color: white; font-size: 0.6rem; }
+        .delete-btn {
+            background: none; border: none; color: #c87941;
+            cursor: pointer; font-size: 0.8rem; opacity: 0.5; padding: 0 2px;
+        }
+        .delete-btn:hover { opacity: 1; }
+        .empty { text-align: center; color: #9e8a77; padding: 2rem 0; font-size: 0.9rem; }
+
+        /* TRAFFIC CARD */
+        .info-card {
+            background: #ece4d4; border: 0.5px solid #d4c4a8;
+            border-radius: 16px; padding: 1rem 1.25rem;
+            margin-top: 1rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        body.dark .info-card { background: #2a1e10; border-color: #3a2a18; }
+        .info-card-left { display: flex; align-items: center; gap: 0.75rem; }
+        .info-card-icon { font-size: 1.2rem; }
+        .info-card-title { font-size: 0.9rem; font-weight: 600; }
+        .info-card-sub   { font-size: 0.75rem; color: #8a7260; margin-top: 1px; }
+        body.dark .info-card-sub { color: #9e8a77; }
+        .info-card-sub.accent { color: #c87941; }
+        .info-card-right { display: flex; align-items: center; gap: 0.75rem; }
+        .info-card-value { font-size: 1.4rem; font-weight: 700; color: #c87941; }
+        .chart-mini svg { overflow: visible; }
+
+        /* WEATHER CARD */
+        .weather-temp-big { font-size: 1.6rem; font-weight: 700; }
+        .weather-desc-text { font-size: 0.8rem; color: #8a7260; margin-top: 2px; }
+        body.dark .weather-desc-text { color: #9e8a77; }
+        .weather-hi-lo { font-size: 0.75rem; color: #8a7260; margin-top: 1px; }
+        body.dark .weather-hi-lo { color: #9e8a77; }
+        .weather-big-icon { font-size: 2rem; opacity: 0.7; }
+
+        /* BOTTOM NAV */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 0.5rem 0 1.2rem;
+            background: #f2ede4;
+            border-top: 0.5px solid #e0d4c0;
+        }
+        body.dark .bottom-nav { background: #1a1208; border-color: #2a1e10; }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 3px; cursor: pointer; min-width: 50px;
+        }
+        .nav-item-icon  { font-size: 1.15rem; color: #8a7260; }
+        .nav-item-label { font-size: 0.65rem; color: #8a7260; }
+        body.dark .nav-item-icon,
+        body.dark .nav-item-label { color: #6a5a48; }
+        .nav-item.active .nav-item-icon,
+        .nav-item.active .nav-item-label { color: #c87941; }
+        .fab {
+            width: 52px; height: 52px; border-radius: 50%;
+            background: #c87941; color: white; border: none;
+            font-size: 1.6rem; cursor: pointer; margin-top: -22px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(200,121,65,0.4);
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">
+        <div class="nav-logo-icon">&#9675;</div>
+        <div class="nav-logo-text">DayFlow<span>AI</span></div>
+    </div>
+    <div class="nav-right">
+        <button class="theme-btn" onclick="toggleTheme()">&#9790;</button>
+        <button class="nav-icon-btn">&#128276;</button>
+        <button class="nav-icon-btn">&#128100;</button>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="greeting">
+        <h2 id="greeting-text">Good morning!</h2>
+        <p id="greeting-sub">You've got a productive day ahead.</p>
+    </div>
+
+    <div class="focus-card">
+        <div class="focus-left">
+            <div class="focus-icon">&#9733;</div>
+            <div>
+                <div class="focus-meta">TODAY'S FOCUS</div>
+                <div class="focus-title" id="focus-title">Loading...</div>
+                <div class="focus-priority">High Priority</div>
+            </div>
+        </div>
+        <div class="progress-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(200,121,65,0.2)" stroke-width="3"/>
+                <circle cx="22" cy="22" r="18" fill="none" stroke="#c87941" stroke-width="3"
+                    stroke-dasharray="113" stroke-dashoffset="45" stroke-linecap="round"/>
+            </svg>
+            <span id="focus-pct">60%</span>
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <div class="qa-item active"><div class="qa-icon">&#128197;</div><div class="qa-label">Schedule</div></div>
+        <div class="qa-item"><div class="qa-icon">&#9989;</div><div class="qa-label">Tasks</div></div>
+        <div class="qa-item"><div class="qa-icon">&#128276;</div><div class="qa-label">Reminders</div></div>
+        <div class="qa-item"><div class="qa-icon">&#129505;</div><div class="qa-label">Wellness</div></div>
+        <div class="qa-item"><div class="qa-icon">&#8942;</div><div class="qa-label">More</div></div>
+    </div>
+
+    <div class="section-header">
+        <div class="section-title">Today's plan</div>
+        <div style="display:flex;gap:0.75rem;align-items:center">
+            <span class="view-all">View all ›</span>
+            <button class="save-btn" style="margin:0;padding:0.35rem 0.9rem;font-size:0.78rem" onclick="toggleForm()">+ Add</button>
+        </div>
+    </div>
+
+    <div class="form-card" id="form-card">
+        <div class="form-row">
+            <input type="text" id="title" placeholder="Event title" />
+            <input type="datetime-local" id="datetime" />
+            <select id="category">
+                <option value="work">Work</option>
+                <option value="personal">Personal</option>
+                <option value="general">General</option>
+            </select>
+        </div>
+        <button class="save-btn" onclick="handleCreateEvent()">Save Event</button>
+    </div>
+
+    <div id="events-list"></div>
+
+    <!-- TRAFFIC CARD -->
+    <div class="info-card">
+        <div class="info-card-left">
+            <div class="info-card-icon">&#128663;</div>
+            <div>
+                <div class="info-card-title">Traffic to Office</div>
+                <div class="info-card-sub">via I-95 N</div>
+                <div class="info-card-sub accent">Light traffic</div>
+            </div>
+        </div>
+        <div class="info-card-right">
+            <div class="info-card-value">25 min</div>
+            <div class="chart-mini">
+                <svg width="52" height="32" viewBox="0 0 52 32">
+                    <polyline points="0,28 12,22 24,18 36,10 52,4"
+                        fill="none" stroke="#c87941" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="52" cy="4" r="3" fill="#c87941"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- WEATHER CARD -->
+    <div class="info-card" style="margin-top:0.75rem">
+        <div class="info-card-left">
+            <div class="info-card-icon" id="weather-icon">&#9925;</div>
+            <div>
+                <div class="weather-temp-big" id="temp">--°F</div>
+                <div class="weather-desc-text" id="weather-desc">Loading...</div>
+                <div class="weather-hi-lo">H: 85° &nbsp; L: 66°</div>
+            </div>
+        </div>
+        <div class="weather-big-icon" id="weather-icon-big">&#9925;</div>
+    </div>
+
+</div>
+
+<div class="bottom-nav">
+    <div class="nav-item active">
+        <div class="nav-item-icon">&#127968;</div>
+        <div class="nav-item-label">Home</div>
+    </div>
+    <div class="nav-item">
+        <div class="nav-item-icon">&#128197;</div>
+        <div class="nav-item-label">Plan</div>
+    </div>
+    <button class="fab" onclick="toggleForm()">+</button>
+    <div class="nav-item">
+        <div class="nav-item-icon">&#9989;</div>
+        <div class="nav-item-label">Tasks</div>
+    </div>
+    <div class="nav-item">
+        <div class="nav-item-icon">&#128100;</div>
+        <div class="nav-item-label">Profile</div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    if (!getToken()) window.location.href = "index.html";
+
+    const catIcons = { work: "&#128203;", personal: "&#127968;", general: "&#128197;" };
+
+    function getGreeting() {
+        const h = new Date().getHours();
+        if (h < 12) return ["Good morning!", "You've got a productive day ahead."];
+        if (h < 17) return ["Good afternoon!", "Keep up the momentum."];
+        return ["Good evening!", "Let's wrap up strong."];
+    }
+
+    function getWeatherIcon(desc) {
+        if (!desc) return "&#9925;";
+        const d = desc.toLowerCase();
+        if (d.includes("rain"))  return "&#127783;";
+        if (d.includes("snow"))  return "&#10052;";
+        if (d.includes("cloud")) return "&#9925;";
+        if (d.includes("clear") || d.includes("sun")) return "&#9728;";
+        return "&#9925;";
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle("dark");
+    }
+
+    function toggleForm() {
+        document.getElementById("form-card").classList.toggle("open");
+    }
+
+    function renderEvents(events) {
+        const today = new Date().toISOString().split("T")[0];
+        const todayEvents = events.filter(e => e.datetime.startsWith(today));
+        const list = document.getElementById("events-list");
+
+        const first = todayEvents[0] || events[0];
+        document.getElementById("focus-title").textContent = first ? first.title : "Nothing scheduled";
+        document.getElementById("focus-pct").textContent   = todayEvents.length + " today";
+
+        if (!events.length) {
+            list.innerHTML = `<div class="empty">No events yet — tap + to add one!</div>`;
+            return;
+        }
+
+        list.innerHTML = events.map(e => {
+            const dt   = new Date(e.datetime);
+            const time = dt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+            const icon = catIcons[e.category] || "&#128197;";
+            return `
+            <div class="event-row">
+                <div class="event-time">${time}</div>
+                <div class="event-icon-wrap">${icon}</div>
+                <div class="event-name">${e.title}</div>
+                <div class="event-check" onclick="this.classList.toggle('done');this.innerHTML=this.classList.contains('done')?'&#10003;':''"></div>
+                <button class="delete-btn" onclick="handleDelete('${e.eventId}')">✕</button>
+            </div>`;
+        }).join("");
+    }
+
+    async function loadDashboard() {
+        const [greet, sub] = getGreeting();
+        document.getElementById("greeting-text").textContent = greet;
+        document.getElementById("greeting-sub").textContent  = sub;
+
+        const [events, briefing] = await Promise.all([
+            getEvents(),
+            getBriefing("Washington DC")
+        ]);
+
+        renderEvents(events);
+
+        const icon = getWeatherIcon(briefing.weather.description);
+        document.getElementById("temp").textContent             = Math.round(briefing.weather.temp) + "°F";
+        document.getElementById("weather-desc").textContent     = briefing.weather.description;
+        document.getElementById("weather-icon").innerHTML       = icon;
+        document.getElementById("weather-icon-big").innerHTML   = icon;
+    }
+
+    async function handleCreateEvent() {
+        const title    = document.getElementById("title").value;
+        const datetime = document.getElementById("datetime").value;
+        const category = document.getElementById("category").value;
+        if (!title || !datetime) { alert("Please fill in title and date"); return; }
+        await createEvent(title, datetime, category);
+        document.getElementById("title").value = "";
+        document.getElementById("form-card").classList.remove("open");
+        loadDashboard();
+    }
+
+    async function handleDelete(eventId) {
+        await deleteEvent(eventId);
+        loadDashboard();
+    }
+
+    loadDashboard();
+</script>
+</body>
+</html>
