@@ -38,7 +38,7 @@ export function WeatherCard({ weather, advice, loading }: WeatherCardProps) {
             <div className="text-2xl font-bold leading-none">
               {Math.round(weather.temp)}°F
             </div>
-            <div className="mt-1 text-xs capitalize text-ink-300 dark:text-ink-200">
+            <div className="mt-1 text-sm capitalize text-ink-300 dark:text-ink-200">
               {weather.description} · {weather.city}
             </div>
             {weather.high != null && weather.low != null ? (
@@ -47,7 +47,7 @@ export function WeatherCard({ weather, advice, loading }: WeatherCardProps) {
               </div>
             ) : null}
             {advice ? (
-              <div className="mt-1.5 text-xs font-medium text-flame-500">
+              <div className="mt-1.5 text-sm font-medium text-flame-500">
                 {advice}
               </div>
             ) : null}

@@ -63,7 +63,7 @@ function NavItem({ to, label, Icon }: NavItemProps) {
       to={to}
       className={({ isActive }) =>
         cn(
-          "flex min-w-[50px] flex-col items-center gap-1 py-1 text-[0.65rem] font-medium transition-colors",
+          "flex min-w-[50px] flex-col items-center gap-1 py-1 text-xs font-medium transition-colors",
           isActive
             ? "text-flame-500"
             : "text-ink-300 dark:text-ink-200 hover:text-ink-400 dark:hover:text-ink-100",

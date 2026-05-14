@@ -49,7 +49,7 @@ export default function Sidebar({ onOpenPalette }: SidebarProps) {
 
       <button
         onClick={onOpenPalette}
-        className="focus-ring mb-4 flex items-center gap-3 rounded-xl border border-cream-400/60 bg-cream-200/70 px-3 py-2.5 text-sm text-ink-300 transition-colors hover:bg-cream-300/60 dark:border-ink-500/40 dark:bg-ink-600/60 dark:text-ink-200 dark:hover:bg-ink-500/40"
+        className="focus-ring mb-4 flex items-center gap-3 rounded-xl border border-cream-400/60 bg-cream-200/70 px-3 py-2.5 text-base text-ink-300 transition-colors hover:bg-cream-300/60 dark:border-ink-500/40 dark:bg-ink-600/60 dark:text-ink-200 dark:hover:bg-ink-500/40"
       >
         <span className="text-base">⌕</span>
         <span className="flex-1 text-left">Search & jump...</span>
@@ -67,7 +67,7 @@ export default function Sidebar({ onOpenPalette }: SidebarProps) {
             end
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-colors",
                 isActive
                   ? "bg-flame-500 text-white shadow-glow"
                   : "text-ink-400 hover:bg-cream-200 dark:text-ink-100 dark:hover:bg-ink-600",
@@ -83,7 +83,7 @@ export default function Sidebar({ onOpenPalette }: SidebarProps) {
       <div className="space-y-2 border-t border-cream-300/60 pt-4 dark:border-ink-600/60">
         {email ? (
           <div
-            className="truncate px-3 text-xs text-ink-300 dark:text-ink-200"
+            className="truncate px-3 text-sm text-ink-300 dark:text-ink-200"
             title={email}
           >
             {email}
@@ -91,14 +91,14 @@ export default function Sidebar({ onOpenPalette }: SidebarProps) {
         ) : null}
         <NavLink
           to="/profile"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-400 transition-colors hover:bg-cream-200 dark:text-ink-100 dark:hover:bg-ink-600"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium text-ink-400 transition-colors hover:bg-cream-200 dark:text-ink-100 dark:hover:bg-ink-600"
         >
           <Settings size={18} />
           <span>Settings</span>
         </NavLink>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-400 transition-colors hover:bg-cream-200 dark:text-ink-100 dark:hover:bg-ink-600"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium text-ink-400 transition-colors hover:bg-cream-200 dark:text-ink-100 dark:hover:bg-ink-600"
         >
           <LogOut size={18} />
           <span>Log out</span>

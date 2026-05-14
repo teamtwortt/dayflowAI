@@ -14,9 +14,9 @@ export function TrafficCard() {
         <div className="flex items-center gap-3">
           <Car size={22} className="text-flame-500" />
           <div>
-            <div className="text-sm font-semibold">Traffic to Office</div>
-            <div className="text-xs text-ink-300 dark:text-ink-200">via I-95 N</div>
-            <div className="text-xs font-medium text-flame-500">Light traffic</div>
+            <div className="text-base font-semibold">Traffic to Office</div>
+            <div className="text-sm text-ink-300 dark:text-ink-200">via I-95 N</div>
+            <div className="text-sm font-medium text-flame-500">Light traffic</div>
           </div>
         </div>
         <div className="flex items-center gap-3">

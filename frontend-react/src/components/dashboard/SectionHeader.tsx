@@ -22,7 +22,7 @@ export function SectionHeader({
         {onViewAll ? (
           <button
             onClick={onViewAll}
-            className="focus-ring rounded-md text-xs font-medium text-flame-500 hover:underline"
+            className="focus-ring rounded-md text-sm font-medium text-flame-500 hover:underline"
           >
             View all ›
           </button>

@@ -6,7 +6,7 @@ s3_prefix = "dayflow-api"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "CognitoUserPoolId=\"us-east-1_3Gz6qj4Jk\" CognitoClientId=\"bf71fo0bs8sjisp1s600r0fph\" EventsTableName=\"dayflow-events\" UsersTableName=\"dayflow-users\" WeatherApiKey=\"none\" CorsOrigins=\"http://localhost:5173,http://localhost:3000\""
+parameter_overrides = "CognitoUserPoolId=\"us-east-1_3Gz6qj4Jk\" CognitoClientId=\"bf71fo0bs8sjisp1s600r0fph\" EventsTableName=\"dayflow-events\" UsersTableName=\"dayflow-users\" WeatherApiKey=\"f98fbc372d9968c0513a710a2e3e8272\" CorsOrigins=\"http://localhost:5173,http://localhost:3000\""
 image_repositories = []
 
 [default.global.parameters]

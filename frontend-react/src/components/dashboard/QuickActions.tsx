@@ -31,7 +31,7 @@ export function QuickActions() {
             )}
           >
             <Icon size={18} />
-            <span className="text-[0.68rem] font-medium">{label}</span>
+            <span className="text-sm font-medium">{label}</span>
           </button>
         );
       })}

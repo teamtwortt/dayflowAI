@@ -43,7 +43,7 @@ export function EventRow({ event, onToggle, onDelete, onClick }: EventRowProps) 
       )}
       onClick={onClick}
     >
-      <div className="w-[60px] shrink-0 text-xs text-ink-300 dark:text-ink-200">
+      <div className="w-[60px] shrink-0 text-sm text-ink-300 dark:text-ink-200">
         {formatTime(event.datetime)}
       </div>
 
@@ -62,13 +62,13 @@ export function EventRow({ event, onToggle, onDelete, onClick }: EventRowProps) 
 
       <div
         className={cn(
-          "min-w-0 flex-1 text-sm font-medium",
+          "min-w-0 flex-1 text-base font-medium",
           event.completed && "text-ink-300 line-through dark:text-ink-200",
         )}
       >
         <div className="truncate">{event.title}</div>
         {event.location ? (
-          <div className="truncate text-xs text-ink-300 dark:text-ink-200">
+          <div className="truncate text-sm text-ink-300 dark:text-ink-200">
             {event.location}
           </div>
         ) : null}

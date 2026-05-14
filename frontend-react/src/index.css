@@ -11,10 +11,12 @@
 
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Serif UI reads small at browser-default 16px; scale root rem (~18px) for readability */
+    font-size: 112.5%;
   }
 
   body {
-    @apply bg-cream-100 text-ink-700 antialiased;
+    @apply bg-cream-100 text-ink-700 antialiased text-base leading-relaxed;
     font-family:
       "Cormorant Garamond", Garamond, Georgia, Cambria, "Times New Roman",
       serif;

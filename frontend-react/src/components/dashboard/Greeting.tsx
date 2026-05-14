@@ -27,8 +27,8 @@ export function Greeting({ serverGreeting, summary, name }: GreetingProps) {
       transition={{ duration: 0.4 }}
       className="mb-5"
     >
-      <h2 className="text-2xl font-bold tracking-tight">{heading}</h2>
-      <p className="mt-1 text-sm text-ink-300 dark:text-ink-200">
+      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{heading}</h2>
+      <p className="mt-1 text-base text-ink-300 dark:text-ink-200">
         {summary || sub}
       </p>
     </motion.div>

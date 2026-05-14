@@ -29,7 +29,7 @@ export function FocusCard({ events, loading }: FocusCardProps) {
           <Star size={18} className="text-flame-300" />
         </div>
         <div>
-          <div className="text-[0.68rem] font-semibold uppercase tracking-wider text-flame-300">
+          <div className="text-xs font-semibold uppercase tracking-wider text-flame-300">
             Today's focus
           </div>
           {loading ? (
@@ -39,7 +39,7 @@ export function FocusCard({ events, loading }: FocusCardProps) {
               {focus ? focus.title : "Nothing scheduled"}
             </div>
           )}
-          <div className="mt-0.5 text-xs text-flame-300">
+          <div className="mt-0.5 text-sm text-flame-300">
             {todays.length} {todays.length === 1 ? "event" : "events"} today
           </div>
         </div>

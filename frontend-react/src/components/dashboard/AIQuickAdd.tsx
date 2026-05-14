@@ -49,7 +49,7 @@ export function AIQuickAdd() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type an event in plain English — e.g. “Lunch with Maya tomorrow at 1pm”"
-          className="flex-1 bg-transparent text-sm text-ink-700 placeholder:text-ink-200 focus:outline-none dark:text-ink-50 dark:placeholder:text-ink-300"
+          className="flex-1 bg-transparent text-base text-ink-700 placeholder:text-ink-200 focus:outline-none dark:text-ink-50 dark:placeholder:text-ink-300"
           disabled={busy}
           aria-label="Add event with natural language"
         />
@@ -65,7 +65,7 @@ export function AIQuickAdd() {
         </Button>
       </form>
       <div className="mt-2 flex flex-wrap gap-1.5 pl-11">
-        <span className="self-center text-[0.65rem] text-ink-300 dark:text-ink-200">
+        <span className="self-center text-xs text-ink-300 dark:text-ink-200">
           Try:
         </span>
         {SUGGESTIONS.map((s) => (
@@ -73,12 +73,12 @@ export function AIQuickAdd() {
             key={s}
             type="button"
             onClick={() => setText(s)}
-            className="rounded-full border border-cream-400/60 bg-cream-100 px-2 py-0.5 text-[0.7rem] text-ink-400 transition-colors hover:bg-flame-500/10 hover:text-flame-600 dark:border-ink-500/40 dark:bg-ink-700 dark:text-ink-200"
+            className="rounded-full border border-cream-400/60 bg-cream-100 px-2 py-1 text-xs text-ink-400 transition-colors hover:bg-flame-500/10 hover:text-flame-600 dark:border-ink-500/40 dark:bg-ink-700 dark:text-ink-200"
           >
             {s}
           </button>
         ))}
-        <span className="ml-auto self-center text-[0.65rem] text-ink-300 dark:text-ink-200">
+        <span className="ml-auto self-center text-xs text-ink-300 dark:text-ink-200">
           <Kbd>⌘</Kbd> <Kbd>K</Kbd> for search
         </span>
       </div>
