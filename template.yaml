@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  DayFlow AI — FastAPI on AWS Lambda + API Gateway HTTP API,
+  fronting Cognito and DynamoDB.
+
+# ---------------------------------------------------------------------------
+# Parameters — values you fill in at deploy time. SAM remembers them in
+# samconfig.toml so future `sam deploy` invocations don't re-prompt.
+# ---------------------------------------------------------------------------
+Parameters:
+  CognitoUserPoolId:
+    Type: String
+    Description: Your existing Cognito User Pool ID (e.g. us-east-1_abc123)
+
+  CognitoClientId:
+    Type: String
+    Description: App client ID from your Cognito User Pool
+
+  EventsTableName:
+    Type: String
+    Default: dayflow-events
+    Description: DynamoDB table that stores events
+
+  UsersTableName:
+    Type: String
+    Default: dayflow-users
+    Description: DynamoDB table that stores user preferences
+
+  WeatherApiKey:
+    Type: String
+    Default: "none"
+    Description: OpenWeatherMap API key, or "none" to use the deterministic stub
+
+  CorsOrigins:
+    Type: String
+    Default: "http://localhost:5173,http://localhost:3000"
+    Description: Comma-separated list of allowed CORS origins
+
+# ---------------------------------------------------------------------------
+# Globals — defaults applied to every Function in this template
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: python3.10
+    Timeout: 30
+    MemorySize: 512
+    Architectures:
+      - x86_64
+    Tracing: Active  # Enables AWS X-Ray distributed tracing for free observability
+
+# ---------------------------------------------------------------------------
+# Resources — the actual AWS infrastructure to create
+# ---------------------------------------------------------------------------
+Resources:
+
+  # ----- API Gateway (HTTP API, v2 — cheaper + simpler than REST API v1) ---
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Description: Public HTTPS frontdoor for the DayFlow API
+      # CORS is handled by FastAPI's CORSMiddleware, but we still need a
+      # permissive preflight at the gateway so OPTIONS requests succeed.
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+
+  # ----- Lambda function running FastAPI via Mangum ------------------------
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: dayflow-api
+      Description: FastAPI app (wrapped by Mangum) handling all DayFlow API routes
+      CodeUri: backend/
+      Handler: lambda_handler.handler
+
+      Environment:
+        Variables:
+          # AWS_REGION is set automatically by Lambda — do not set it here
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          DYNAMO_EVENTS_TABLE: !Ref EventsTableName
+          DYNAMO_USERS_TABLE: !Ref UsersTableName
+          WEATHER_API_KEY: !Ref WeatherApiKey
+          CORS_ORIGINS: !Ref CorsOrigins
+
+      Policies:
+        # 1) DynamoDB CRUD on the two tables (least-privilege scope)
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTableName
+
+        # 2) Cognito user-pool admin actions (used by future profile-edit features)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminUpdateUserAttributes
+                - cognito-idp:ListUsers
+              Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
+
+        # 3) Bedrock — Claude Haiku for AI features (optional; safe to keep
+        #    even before you enable model access in the console)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-*"
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-haiku-*"
+
+      Events:
+        # Two routes register the function for ALL paths under the API Gateway
+        # so FastAPI can do its own routing inside Lambda.
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+
+    Metadata:
+      BuildMethod: python3.10  # Tells SAM to build with python3.10 toolchain
+
+# ---------------------------------------------------------------------------
+# Outputs — values returned after deploy. Visible via `sam list endpoints`
+# or in the CloudFormation console.
+# ---------------------------------------------------------------------------
+Outputs:
+  ApiUrl:
+    Description: Base URL of the deployed DayFlow API
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+
+  FunctionName:
+    Description: Lambda function name (useful for tail-logging)
+    Value: !Ref ApiFunction
+
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt ApiFunction.Arn
+
+  LogGroup:
+    Description: CloudWatch log group for tailing
+    Value: !Sub "/aws/lambda/${ApiFunction}"
