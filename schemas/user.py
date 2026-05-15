@@ -1,7 +1,6 @@
-"""User preference schemas."""
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class UserPreferences(BaseModel):
@@ -15,7 +14,7 @@ class UserPreferences(BaseModel):
 
 class UserProfile(BaseModel):
     sub: str
-    email: EmailStr
+    email: str = ""
     name: Optional[str] = None
     preferences: UserPreferences
 

@@ -1,15 +1,21 @@
 """OpenWeatherMap integration + advice generation."""
+import logging
+
 import requests
 
 from config import settings
 
+
+logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
 def get_weather(city: str) -> dict:
     """Fetch current weather for `city`. Returns a safe stub if the API fails."""
-    if not settings.WEATHER_API_KEY:
+    api_key = settings.WEATHER_API_KEY
+    if not api_key or api_key.lower() in {"none", "stub", "disabled"}:
+        logger.warning("Weather stub: WEATHER_API_KEY missing or placeholder (city=%r)", city)
         return _stub(city)
     try:
         resp = requests.get(
@@ -18,6 +24,12 @@ def get_weather(city: str) -> dict:
             timeout=5,
         )
         if resp.status_code != 200:
+            logger.warning(
+                "Weather stub: OpenWeather HTTP %s for city=%r — %s",
+                resp.status_code,
+                city,
+                (resp.text or "")[:300],
+            )
             return _stub(city)
         data = resp.json()
         return {
@@ -32,6 +44,7 @@ def get_weather(city: str) -> dict:
             "icon": data["weather"][0].get("icon"),
         }
     except (requests.RequestException, KeyError, ValueError):
+        logger.warning("Weather stub: OpenWeather request failed (city=%r)", city, exc_info=True)
         return _stub(city)
 
 

@@ -80,7 +80,7 @@ def delete_event(user_id: str, event_id: str) -> None:
     _events_table.delete_item(Key={"userId": user_id, "eventId": event_id})
 
 
-# Tasks (PK=userId SK=taskId) -------------------------------------------------
+# Tasks (PK=userId SK=taskId) --------------------------------------------------
 def list_tasks(user_id: str) -> List[dict]:
     resp = _tasks_table.query(KeyConditionExpression=Key("userId").eq(user_id))
     items = resp.get("Items", [])

@@ -10,11 +10,11 @@ Can also be invoked locally via `python -m dispatcher` for end-to-end testing.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, time
+from datetime import datetime, timezone
 from typing import Iterable
 
 import boto3
-from boto3.dynamodb.conditions import Attr
+from zoneinfo import ZoneInfo
 
 from config import settings
 from services.bedrock import generate_briefing
@@ -30,6 +30,15 @@ _resource = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
 _users_table = _resource.Table(settings.DYNAMO_USERS_TABLE)
 
 
+def _safe_tz(name: str | None) -> ZoneInfo:
+    if not name or not str(name).strip():
+        return ZoneInfo("UTC")
+    try:
+        return ZoneInfo(str(name).strip())
+    except Exception:
+        return ZoneInfo("UTC")
+
+
 def _all_users() -> Iterable[dict]:
     """Yield every user record (paginated scan)."""
     kwargs: dict = {}
@@ -42,20 +51,26 @@ def _all_users() -> Iterable[dict]:
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def _users_due(now: datetime) -> Iterable[dict]:
-    """Yield only users whose preferred briefing time matches the current minute."""
-    target = now.strftime("%H:%M")
-    return (
-        u
-        for u in _all_users()
-        if (u.get("preferences") or {}).get("briefing_time", "07:00") == target
-    )
+def _users_due(now_utc: datetime) -> Iterable[dict]:
+    """Users whose preferred briefing_time matches their local HH:MM."""
+    now_utc = now_utc.astimezone(timezone.utc)
+    for u in _all_users():
+        prefs = u.get("preferences") or {}
+        local = now_utc.astimezone(_safe_tz(prefs.get("timezone")))
+        target = local.strftime("%H:%M")
+        if prefs.get("briefing_time", "07:00") == target:
+            yield u
 
 
-def build_briefing_payload(user_id: str, prefs: dict) -> dict:
+def build_briefing_payload(
+    user_id: str, prefs: dict, *, now_utc: datetime | None = None
+) -> dict:
     """Compose a single user's briefing data (events + weather + AI prose)."""
+    now_utc = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    tz = _safe_tz(prefs.get("timezone"))
+    now_local = now_utc.astimezone(tz)
+    today_iso = now_local.date().isoformat()
     city = prefs.get("city", "Washington DC")
-    today_iso = datetime.now().date().isoformat()
     all_events = list_events(user_id)
     todays = [e for e in all_events if str(e.get("datetime", "")).startswith(today_iso)]
     weather = get_weather(city)
@@ -139,14 +154,19 @@ def _format_sms(payload: dict) -> str:
 
 def dispatch_all(now: datetime | None = None) -> dict:
     """Run the dispatch pass. Returns a small summary dict."""
-    now = now or datetime.now()
+    now_utc = now or datetime.now(timezone.utc)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    else:
+        now_utc = now_utc.astimezone(timezone.utc)
+
     sent_email = sent_sms = 0
-    for user in _users_due(now):
+    for user in _users_due(now_utc):
         email = user.get("email")
         prefs = user.get("preferences") or {}
         if not email:
             continue
-        payload = build_briefing_payload(user["userId"], prefs)
+        payload = build_briefing_payload(user["userId"], prefs, now_utc=now_utc)
         if prefs.get("notifications_email", True):
             subject, html, text = _format_email(email, payload)
             if send_email(email, subject, html, text):
@@ -154,7 +174,7 @@ def dispatch_all(now: datetime | None = None) -> dict:
         if prefs.get("notifications_sms") and prefs.get("phone"):
             if send_sms(prefs["phone"], _format_sms(payload)):
                 sent_sms += 1
-    summary = {"sent_email": sent_email, "sent_sms": sent_sms, "at": now.isoformat()}
+    summary = {"sent_email": sent_email, "sent_sms": sent_sms, "at": now_utc.isoformat()}
     logger.info("Dispatch complete: %s", summary)
     return summary
 
@@ -163,9 +183,9 @@ def dispatch_all(now: datetime | None = None) -> dict:
 def handler(event, context):  # noqa: D401
     """AWS Lambda handler for EventBridge scheduled invocations."""
     _ = event, context  # unused
-    summary = dispatch_all()
+    summary = dispatch_all(datetime.now(timezone.utc))
     return {"statusCode": 200, "body": summary}
 
 
 if __name__ == "__main__":  # pragma: no cover
-    print(dispatch_all())
+    print(dispatch_all(datetime.now(timezone.utc)))

@@ -36,7 +36,7 @@ def test_assistant_next_event():
 
 def test_assistant_empty():
     reply = _heuristic_assistant_reply("what's next?", [], _now())
-    assert reply  # non-empty
+    assert reply  
 
 
 def test_assistant_today():

@@ -21,6 +21,9 @@ logging.basicConfig(
 logger = logging.getLogger("dayflow")
 
 
+_AMPLIFY_APP_ORIGIN_REGEX = r"https://[\w.-]+\.amplifyapp\.com"
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="DayFlow AI API",
@@ -37,6 +40,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
+        allow_origin_regex=_AMPLIFY_APP_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

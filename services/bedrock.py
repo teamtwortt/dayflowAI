@@ -19,18 +19,43 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
-_BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
-
 try:
     _runtime = boto3.client("bedrock-runtime", region_name=settings.AWS_REGION)
-except Exception as exc:  # pragma: no cover
+except Exception as exc: 
     logger.warning("Bedrock client init failed: %s", exc)
     _runtime = None
 
 
-def _invoke_claude(system: str, user: str, max_tokens: int = 600) -> Optional[str]:
-    """Call Claude on Bedrock. Returns the text body, or None on failure."""
+def _guardrail_allows(text: str, source: str) -> bool:
+    gid = (settings.BEDROCK_GUARDRAIL_ID or "").strip()
+    if not gid:
+        return True
     if _runtime is None:
+        return True
+    ver = (settings.BEDROCK_GUARDRAIL_VERSION or "DRAFT").strip() or "DRAFT"
+    snippet = text[:95000]
+    try:
+        resp = _runtime.apply_guardrail(
+            guardrailIdentifier=gid,
+            guardrailVersion=ver,
+            source=source,
+            content=[{"text": {"text": snippet}}],
+        )
+        action = resp.get("action")
+        if action == "GUARDRAIL_INTERVENED":
+            logger.warning("Bedrock Guardrail intervened (%s)", source)
+            return False
+        return True
+    except (ClientError, BotoCoreError, ValueError, KeyError, TypeError) as exc:
+        logger.warning("Bedrock Guardrail check failed (%s): %s", source, exc)
+        return True
+
+
+def _invoke_claude(system: str, user: str, max_tokens: int = 600) -> Optional[str]:
+    if _runtime is None:
+        return None
+    combined_in = f"{system}\n\n{user}"
+    if not _guardrail_allows(combined_in, "INPUT"):
         return None
     body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -40,7 +65,7 @@ def _invoke_claude(system: str, user: str, max_tokens: int = 600) -> Optional[st
     }
     try:
         resp = _runtime.invoke_model(
-            modelId=_BEDROCK_MODEL_ID,
+            modelId=settings.BEDROCK_MODEL_ID,
             contentType="application/json",
             accept="application/json",
             body=json.dumps(body),
@@ -49,15 +74,14 @@ def _invoke_claude(system: str, user: str, max_tokens: int = 600) -> Optional[st
         parts = payload.get("content", [])
         if not parts:
             return None
-        return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+        text = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+        if text and not _guardrail_allows(text, "OUTPUT"):
+            return None
+        return text or None
     except (ClientError, BotoCoreError, ValueError, KeyError) as exc:
         logger.info("Bedrock invocation fell back to heuristic: %s", exc)
         return None
 
-
-# ---------------------------------------------------------------------------
-# 1) Natural-language event parsing
-# ---------------------------------------------------------------------------
 
 _EVENT_PARSE_SYSTEM = (
     "You are a strict structured-data extractor for a calendar app. "
@@ -72,11 +96,7 @@ _EVENT_PARSE_SYSTEM = (
 
 
 def parse_event_text(text: str, *, now: Optional[datetime] = None) -> dict:
-    """Parse free-form text into a structured event dict.
 
-    Always returns a dict with at least `title` and `datetime`. Falls back to
-    a heuristic parser if Bedrock is unavailable.
-    """
     current = now or datetime.now()
     user_prompt = (
         f"Current local datetime: {current.isoformat()}\n"
@@ -97,7 +117,7 @@ def parse_event_text(text: str, *, now: Optional[datetime] = None) -> dict:
 def _extract_json(raw: str) -> str:
     raw = raw.strip()
     if raw.startswith("```"):
-        # Strip fences like ```json ... ```
+  
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
     return raw
@@ -133,10 +153,9 @@ _DAY_OFFSETS = {
 
 
 def _heuristic_parse_event(text: str, now: datetime) -> dict:
-    """A deterministic fallback so the feature still works without Bedrock."""
     lower = text.lower()
 
-    # Resolve day
+    
     offset = 0
     for key, default in _DAY_OFFSETS.items():
         if key in lower:
@@ -147,7 +166,7 @@ def _heuristic_parse_event(text: str, now: datetime) -> dict:
                 offset = (target - now.weekday()) % 7 or 7
             break
 
-    # Resolve time
+
     hour, minute = 9, 0
     m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", lower)
     if m:
@@ -161,7 +180,7 @@ def _heuristic_parse_event(text: str, now: datetime) -> dict:
 
     dt = (now + timedelta(days=offset)).replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    # Category heuristic
+
     category = "general"
     if any(w in lower for w in ["meeting", "standup", "call", "review", "1:1", "client"]):
         category = "work"
@@ -172,7 +191,6 @@ def _heuristic_parse_event(text: str, now: datetime) -> dict:
     elif any(w in lower for w in ["home", "groceries", "errand", "kids", "school"]):
         category = "personal"
 
-    # Title: strip the time/day tokens loosely
     title = re.sub(
         r"\b(today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|at\s+\d{1,2}(:\d{2})?\s*(am|pm)?)\b",
         "",
@@ -182,7 +200,7 @@ def _heuristic_parse_event(text: str, now: datetime) -> dict:
     title = re.sub(r"\s+", " ", title).strip(" ,.-:") or "Untitled event"
     title = title[:1].upper() + title[1:]
 
-    # Location heuristic ("at <place>")
+ 
     location = None
     loc_match = re.search(r"\bat\s+([A-Z][\w\s]+)", text)
     if loc_match:
@@ -196,10 +214,6 @@ def _heuristic_parse_event(text: str, now: datetime) -> dict:
         "notes": None,
     }
 
-
-# ---------------------------------------------------------------------------
-# 2) AI-generated daily briefing
-# ---------------------------------------------------------------------------
 
 _BRIEFING_SYSTEM = (
     "You are DayFlow AI's morning briefing writer. "
@@ -226,10 +240,6 @@ def generate_briefing(
     )
     return _invoke_claude(_BRIEFING_SYSTEM, user, max_tokens=250)
 
-
-# ---------------------------------------------------------------------------
-# 3) Assistant chat
-# ---------------------------------------------------------------------------
 
 _ASSISTANT_SYSTEM = (
     "You are DayFlow AI, a calm, helpful productivity assistant. "
@@ -303,7 +313,7 @@ def _safe_parse(value: str) -> Optional[datetime]:
     except (ValueError, AttributeError):
         try:
             return datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
-        except Exception:  # pragma: no cover
+        except Exception:  
             return None
 
 

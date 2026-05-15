@@ -28,7 +28,6 @@ def _jwks() -> dict:
 
 
 def verify_token(token: str) -> Optional[dict]:
-    """Verify a Cognito ID token and return its claims, or None on failure."""
     if not token:
         return None
     try:

@@ -1,4 +1,3 @@
-"""Event schemas."""
 from typing import Literal, Optional
 from datetime import datetime
 
