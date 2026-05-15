@@ -2,6 +2,13 @@ import axios, { AxiosError } from "axios";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || "";
 
+if (import.meta.env.PROD && !baseURL.trim()) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "[DayFlow] VITE_API_BASE_URL is missing in this build. API calls go to the wrong host; set it in amplify.yml (env.variables) or Amplify Environment variables.",
+  );
+}
+
 export const api = axios.create({
   baseURL,
   timeout: 15_000,

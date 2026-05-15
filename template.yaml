@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  DayFlow AI — FastAPI on AWS Lambda + API Gateway HTTP API,
-  fronting Cognito and DynamoDB.
+  DayFlow AI — FastAPI on Lambda + HTTP API (Cognito, DynamoDB), scheduled briefing
+  dispatcher (EventBridge → Bedrock Haiku → SES/SNS), optional Bedrock Guardrails.
 
 # ---------------------------------------------------------------------------
 # Parameters — values you fill in at deploy time. SAM remembers them in
@@ -36,6 +36,38 @@ Parameters:
     Type: String
     Default: "http://localhost:5173,http://localhost:3000"
     Description: Comma-separated list of allowed CORS origins
+
+  SesFromEmail:
+    Type: String
+    Default: "no-reply@dayflowai.example"
+    Description: Verified SES identity used as the From address for briefing emails.
+
+  BriefingDispatcherEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable EventBridge schedule for the morning-briefing dispatcher Lambda.
+
+  BedrockGuardrailId:
+    Type: String
+    Default: ""
+    Description: Optional Bedrock Guardrail ID for ApplyGuardrail; leave empty to disable.
+
+  BedrockGuardrailVersion:
+    Type: String
+    Default: "DRAFT"
+    Description: Guardrail version (DRAFT or a numeric version).
+
+  BedrockModelId:
+    Type: String
+    Default: "anthropic.claude-haiku-4-5-20251001-v1:0"
+    Description: >
+      Bedrock Claude Haiku model ID (use Haiku 4.5 for active lifecycle; 3.x/3.5 Haiku may show Legacy).
+
+Conditions:
+  DispatcherScheduleEnabled: !Equals [!Ref BriefingDispatcherEnabled, "true"]
 
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every Function in this template
@@ -92,6 +124,10 @@ Resources:
           DYNAMO_USERS_TABLE: !Ref UsersTableName
           WEATHER_API_KEY: !Ref WeatherApiKey
           CORS_ORIGINS: !Ref CorsOrigins
+          SES_FROM_EMAIL: !Ref SesFromEmail
+          BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
+          BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
 
       Policies:
         # 1) DynamoDB CRUD on the two tables (least-privilege scope)
@@ -116,8 +152,16 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource:
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-haiku-*"
+
+        # Optional Bedrock Guardrails (ApplyGuardrail); harmless when guardrail ID is unset.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:ApplyGuardrail
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/*"
 
       Events:
         # Two routes register the function for ALL paths under the API Gateway
@@ -137,6 +181,72 @@ Resources:
 
     Metadata:
       BuildMethod: python3.10  # Tells SAM to build with python3.10 toolchain
+
+  # ----- Scheduled dispatcher — Bedrock briefing + SES email + SNS SMS ------------
+  DispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: dayflow-dispatcher
+      Description: >
+        EventBridge-scheduled dispatcher: scans users due for briefing (local time),
+        calls Bedrock (Haiku), sends SES email and optional SNS SMS.
+      CodeUri: backend/
+      Handler: dispatcher.handler
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          DYNAMO_EVENTS_TABLE: !Ref EventsTableName
+          DYNAMO_USERS_TABLE: !Ref UsersTableName
+          WEATHER_API_KEY: !Ref WeatherApiKey
+          SES_FROM_EMAIL: !Ref SesFromEmail
+          BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
+          BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-*"
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-*"
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-haiku-*"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:ApplyGuardrail
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/*"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: "*"
+
+      Events:
+        BriefingSchedule:
+          Type: Schedule
+          Properties:
+            # Runs every minute so each user's briefing_time (HH:MM in their timezone) can match.
+            # Cost scales with users × invocations; tune later with Scheduler or consolidated windows.
+            Schedule: rate(1 minute)
+            Name: dayflow-briefing-tick
+            Description: Match users whose local briefing_time equals current HH:MM
+            Enabled: !If [DispatcherScheduleEnabled, true, false]
+
+    Metadata:
+      BuildMethod: python3.10
 
 # ---------------------------------------------------------------------------
 # Outputs — values returned after deploy. Visible via `sam list endpoints`
@@ -160,3 +270,11 @@ Outputs:
   LogGroup:
     Description: CloudWatch log group for tailing
     Value: !Sub "/aws/lambda/${ApiFunction}"
+
+  DispatcherFunctionArn:
+    Description: ARN of the scheduled briefing dispatcher Lambda
+    Value: !GetAtt DispatcherFunction.Arn
+
+  DispatcherLogGroup:
+    Description: CloudWatch log group for the dispatcher (same path convention as Lambda)
+    Value: "/aws/lambda/dayflow-dispatcher"
