@@ -388,7 +388,7 @@ function BrandPanel() {
             <path
               d="M22 32 L29 39 L43 25"
               fill="none"
-              stroke="#eb9457"
+              stroke="#202124"
               strokeWidth="4.5"
               strokeLinecap="round"
               strokeLinejoin="round"

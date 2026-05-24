@@ -15,15 +15,25 @@ import { useBriefing } from "../hooks/useBriefing";
 import { useAddEventTrigger } from "../components/layout/addEventContext";
 import { useProfile } from "../hooks/useProfile";
 import { startsWithToday } from "../lib/format";
+import { decodeIdTokenClaims, displayNameFromClaims } from "../lib/idTokenClaims";
+import { useAuthStore } from "../store/auth";
 import type { DayflowEvent } from "../api/types";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const profile = useProfile();
-  const city = profile.data?.preferences.city;
+  const authEmail = useAuthStore((s) => s.email);
+  const idToken = useAuthStore((s) => s.token);
+  const tokenClaims = decodeIdTokenClaims(idToken);
+
+  const greetingName =
+    profile.data?.name?.trim() ||
+    displayNameFromClaims(tokenClaims) ||
+    profile.data?.email?.split("@")[0] ||
+    authEmail?.split("@")[0];
 
   const events = useEvents();
-  const briefing = useBriefing(city);
+  const briefing = useBriefing();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<DayflowEvent | null>(null);
   const { openTrigger } = useAddEventTrigger();
@@ -52,7 +62,7 @@ export default function Dashboard() {
       <Greeting
         serverGreeting={briefing.data?.greeting}
         summary={briefing.data?.summary}
-        name={profile.data?.name}
+        name={greetingName}
       />
 
       <FocusCard events={events.data} loading={events.isLoading} />
@@ -80,6 +90,8 @@ export default function Dashboard() {
           weather={briefing.data?.weather}
           advice={briefing.data?.advice}
           loading={briefing.isLoading}
+          error={briefing.isError}
+          onRetry={() => void briefing.refetch()}
         />
       </div>
 

@@ -30,7 +30,7 @@
   }
 
   ::selection {
-    @apply bg-flame-200 text-ink-700;
+    @apply bg-ice-200 text-ink-700;
   }
 
   /* Native scrollbar refinement */
@@ -71,7 +71,7 @@
   }
 
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flame-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-100 dark:focus-visible:ring-offset-ink-700;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ice-300 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-100 dark:focus-visible:ring-offset-ink-700;
   }
 
   .skeleton {

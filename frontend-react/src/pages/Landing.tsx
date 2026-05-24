@@ -214,7 +214,7 @@ export default function Landing() {
               className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl lg:text-7xl"
             >
               Your day,{" "}
-              <span className="bg-gradient-to-r from-flame-400 to-flame-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-ink-700 to-flame-700 bg-clip-text text-transparent dark:from-cream-50 dark:to-flame-300">
                 intelligently orchestrated.
               </span>
             </motion.h1>

@@ -34,6 +34,31 @@ export interface EventUpdatePayload extends Partial<EventCreatePayload> {
   completed?: boolean;
 }
 
+export type TaskPriority = "low" | "medium" | "high";
+
+export interface DayflowTask {
+  userId: string;
+  taskId: string;
+  title: string;
+  notes?: string | null;
+  dueDate?: string | null;
+  priority?: TaskPriority | null;
+  completed: boolean;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
+export interface TaskCreatePayload {
+  title: string;
+  notes?: string | null;
+  dueDate?: string | null;
+  priority?: TaskPriority;
+}
+
+export interface TaskUpdatePayload extends Partial<TaskCreatePayload> {
+  completed?: boolean;
+}
+
 export interface Weather {
   temp: number;
   feels_like?: number | null;

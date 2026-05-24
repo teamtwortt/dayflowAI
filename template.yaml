@@ -20,17 +20,26 @@ Parameters:
   EventsTableName:
     Type: String
     Default: dayflow-events
-    Description: DynamoDB table that stores events
+    Description: DynamoDB events/schedule table (PK userId, SK eventId) — e.g. schedules
 
   UsersTableName:
     Type: String
     Default: dayflow-users
-    Description: DynamoDB table that stores user preferences
+    Description: DynamoDB user prefs table (PK userId) — e.g. users
+
+  TasksTableName:
+    Type: String
+    Default: dayflow-tasks
+    Description: DynamoDB tasks table (PK userId, SK taskId) — e.g. tasks
 
   WeatherApiKey:
     Type: String
     Default: "none"
-    Description: OpenWeatherMap API key, or "none" to use the deterministic stub
+    NoEcho: true
+    Description: >
+      OpenWeatherMap API key. Seeds the Secrets Manager secret on first deploy;
+      omit or set to "none" to use the deterministic weather stub. Marked NoEcho
+      so it is masked in the CloudFormation console.
 
   CorsOrigins:
     Type: String
@@ -62,12 +71,23 @@ Parameters:
 
   BedrockModelId:
     Type: String
-    Default: "anthropic.claude-haiku-4-5-20251001-v1:0"
+    Default: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     Description: >
-      Bedrock Claude Haiku model ID (use Haiku 4.5 for active lifecycle; 3.x/3.5 Haiku may show Legacy).
+      Bedrock Claude inference-profile ID. Haiku 4.5 is on-demand-incompatible
+      and MUST be invoked via a cross-region inference profile (e.g.
+      ``us.anthropic.claude-haiku-4-5-...``). Use a raw model ID (e.g.
+      ``anthropic.claude-3-haiku-...``) only for legacy models.
+
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: >
+      Optional email address to subscribe to operational CloudWatch alarms (5xx, Lambda errors,
+      slow API). Leave empty to skip the subscription; you can still subscribe manually later.
 
 Conditions:
   DispatcherScheduleEnabled: !Equals [!Ref BriefingDispatcherEnabled, "true"]
+  AlertEmailProvided: !Not [!Equals [!Ref AlertEmail, ""]]
 
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every Function in this template
@@ -85,6 +105,17 @@ Globals:
 # Resources — the actual AWS infrastructure to create
 # ---------------------------------------------------------------------------
 Resources:
+
+  # ----- Secrets Manager: OpenWeather API key -------------------------------
+  # Stored as JSON `{"apiKey": "..."}` so we can add provider/usage fields
+  # later without breaking consumers. Seeded from the WeatherApiKey parameter
+  # on first deploy; rotate out-of-band via `aws secretsmanager put-secret-value`.
+  WeatherApiSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: dayflow/weather-api-key
+      Description: OpenWeatherMap API key consumed by dayflow-api and dayflow-dispatcher.
+      SecretString: !Sub '{"apiKey":"${WeatherApiKey}"}'
 
   # ----- API Gateway (HTTP API, v2 — cheaper + simpler than REST API v1) ---
   HttpApi:
@@ -122,7 +153,10 @@ Resources:
           COGNITO_CLIENT_ID: !Ref CognitoClientId
           DYNAMO_EVENTS_TABLE: !Ref EventsTableName
           DYNAMO_USERS_TABLE: !Ref UsersTableName
-          WEATHER_API_KEY: !Ref WeatherApiKey
+          DYNAMO_TASKS_TABLE: !Ref TasksTableName
+          # Weather key is fetched from Secrets Manager at cold start (services/weather.py).
+          # We only pass the secret's ARN here, never the plaintext key.
+          WEATHER_SECRET_ARN: !Ref WeatherApiSecret
           CORS_ORIGINS: !Ref CorsOrigins
           SES_FROM_EMAIL: !Ref SesFromEmail
           BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
@@ -130,11 +164,20 @@ Resources:
           BEDROCK_MODEL_ID: !Ref BedrockModelId
 
       Policies:
-        # 1) DynamoDB CRUD on the two tables (least-privilege scope)
+        # 1) DynamoDB CRUD (least-privilege per table)
         - DynamoDBCrudPolicy:
             TableName: !Ref EventsTableName
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTableName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTableName
+
+        # 1b) Secrets Manager: read-only on just the weather secret (least-privilege)
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WeatherApiSecret
 
         # 2) Cognito user-pool admin actions (used by future profile-edit features)
         - Statement:
@@ -145,14 +188,22 @@ Resources:
                 - cognito-idp:ListUsers
               Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}"
 
-        # 3) Bedrock — Claude Haiku for AI features (optional; safe to keep
-        #    even before you enable model access in the console)
+        # 3) Bedrock — Claude Haiku for AI features.
+        #    Haiku 4.5 requires a cross-region inference profile (Haiku 4.5 is
+        #    not on-demand-invokable directly), which fans out across
+        #    us-east-1 / us-east-2 / us-west-2. We grant InvokeModel on the
+        #    profile ARN AND on the underlying foundation models in every
+        #    fan-out region.
         - Statement:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
               Resource:
-                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-*"
+                - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-haiku-*"
 
@@ -198,7 +249,9 @@ Resources:
         Variables:
           DYNAMO_EVENTS_TABLE: !Ref EventsTableName
           DYNAMO_USERS_TABLE: !Ref UsersTableName
-          WEATHER_API_KEY: !Ref WeatherApiKey
+          DYNAMO_TASKS_TABLE: !Ref TasksTableName
+          # Weather key sourced from Secrets Manager — ARN only, never plaintext.
+          WEATHER_SECRET_ARN: !Ref WeatherApiSecret
           SES_FROM_EMAIL: !Ref SesFromEmail
           BEDROCK_GUARDRAIL_ID: !Ref BedrockGuardrailId
           BEDROCK_GUARDRAIL_VERSION: !Ref BedrockGuardrailVersion
@@ -212,9 +265,18 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref WeatherApiSecret
+        - Statement:
+            - Effect: Allow
+              Action:
                 - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
               Resource:
-                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-*"
+                - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-*"
+                - "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-*"
                 - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-haiku-*"
         - Statement:
@@ -248,6 +310,259 @@ Resources:
     Metadata:
       BuildMethod: python3.10
 
+  # ----- Operational alerts: SNS topic + email subscription ----------------
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: dayflow-alerts
+      DisplayName: DayFlow Alerts
+
+  AlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: AlertEmailProvided
+    Properties:
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+      TopicArn: !Ref AlertsTopic
+
+  # ----- CloudWatch Alarms (3) ---------------------------------------------
+  # 1) API Gateway HTTP API 5xx errors — anything > 5 over 5 min is a problem.
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: dayflow-api-5xx-errors
+      AlarmDescription: >
+        Triggers when the HTTP API returns 5xx responses, which usually means
+        the Lambda or downstream (DynamoDB / Bedrock / SES / SNS) failed.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HttpApi
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertsTopic
+      OKActions:
+        - !Ref AlertsTopic
+
+  # 2) Lambda errors on the FastAPI function — unhandled exceptions.
+  ApiLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: dayflow-api-lambda-errors
+      AlarmDescription: >
+        Triggers when the dayflow-api Lambda raises unhandled errors. Pair
+        with CloudWatch Logs Insights to find the failing request id.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertsTopic
+      OKActions:
+        - !Ref AlertsTopic
+
+  # 3) p95 latency on the FastAPI Lambda > proposal target of 2s.
+  ApiLambdaP95LatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: dayflow-api-p95-latency
+      AlarmDescription: >
+        Triggers when the dayflow-api p95 duration exceeds the project's <2s
+        target. Sustained breaches indicate cold starts, slow downstreams,
+        or hot DynamoDB partitions.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiFunction
+      ExtendedStatistic: p95
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 2000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertsTopic
+      OKActions:
+        - !Ref AlertsTopic
+
+  # ----- CloudWatch Dashboard ----------------------------------------------
+  OperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: DayFlow-Operations
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "API Gateway — Requests & Errors",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiId", "${HttpApi}", { "stat": "Sum", "label": "Total requests" } ],
+                  [ ".", "4xx", ".", ".", { "stat": "Sum", "label": "4xx" } ],
+                  [ ".", "5xx", ".", ".", { "stat": "Sum", "label": "5xx", "color": "#d62728" } ]
+                ],
+                "period": 60,
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "API Gateway — Latency (ms)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiId", "${HttpApi}", { "stat": "Average", "label": "Average" } ],
+                  [ "...", { "stat": "p95", "label": "p95" } ],
+                  [ "...", { "stat": "p99", "label": "p99" } ]
+                ],
+                "period": 60,
+                "annotations": {
+                  "horizontal": [
+                    { "label": "2s SLO", "value": 2000, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda dayflow-api — Invocations / Errors / Throttles",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${ApiFunction}", { "stat": "Sum" } ],
+                  [ ".", "Errors", ".", ".", { "stat": "Sum", "color": "#d62728" } ],
+                  [ ".", "Throttles", ".", ".", { "stat": "Sum", "color": "#ff7f0e" } ]
+                ],
+                "period": 60
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda dayflow-api — Duration (ms)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/Lambda", "Duration", "FunctionName", "${ApiFunction}", { "stat": "Average" } ],
+                  [ "...", { "stat": "p95" } ],
+                  [ "...", { "stat": "p99" } ]
+                ],
+                "period": 60,
+                "annotations": {
+                  "horizontal": [
+                    { "label": "2s SLO", "value": 2000, "color": "#d62728" }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 12, "width": 8, "height": 6,
+              "properties": {
+                "title": "DynamoDB — Consumed Capacity (events)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${EventsTableName}", { "stat": "Sum", "label": "Read" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "stat": "Sum", "label": "Write" } ]
+                ],
+                "period": 60
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8, "y": 12, "width": 8, "height": 6,
+              "properties": {
+                "title": "DynamoDB — Consumed Capacity (tasks)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${TasksTableName}", { "stat": "Sum", "label": "Read" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "stat": "Sum", "label": "Write" } ]
+                ],
+                "period": 60
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16, "y": 12, "width": 8, "height": 6,
+              "properties": {
+                "title": "DynamoDB — Throttled Requests",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/DynamoDB", "ThrottledRequests", "TableName", "${EventsTableName}", { "stat": "Sum", "label": "events" } ],
+                  [ "...", "${TasksTableName}", { "stat": "Sum", "label": "tasks" } ],
+                  [ "...", "${UsersTableName}", { "stat": "Sum", "label": "users" } ]
+                ],
+                "period": 60
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 18, "width": 12, "height": 6,
+              "properties": {
+                "title": "Dispatcher — Invocations & Errors",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${DispatcherFunction}", { "stat": "Sum" } ],
+                  [ ".", "Errors", ".", ".", { "stat": "Sum", "color": "#d62728" } ]
+                ],
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 18, "width": 12, "height": 6,
+              "properties": {
+                "title": "Notifications — SES / SNS delivery",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  [ "AWS/SES", "Send", { "stat": "Sum", "label": "SES sends" } ],
+                  [ ".", "Bounce", { "stat": "Sum", "label": "SES bounces", "color": "#d62728" } ],
+                  [ "AWS/SNS", "NumberOfMessagesPublished", { "stat": "Sum", "label": "SNS published" } ],
+                  [ ".", "NumberOfNotificationsFailed", { "stat": "Sum", "label": "SNS failed", "color": "#d62728" } ]
+                ],
+                "period": 300
+              }
+            }
+          ]
+        }
+
 # ---------------------------------------------------------------------------
 # Outputs — values returned after deploy. Visible via `sam list endpoints`
 # or in the CloudFormation console.
@@ -278,3 +593,19 @@ Outputs:
   DispatcherLogGroup:
     Description: CloudWatch log group for the dispatcher (same path convention as Lambda)
     Value: "/aws/lambda/dayflow-dispatcher"
+
+  AlertsTopicArn:
+    Description: SNS topic ARN that receives operational CloudWatch alarms.
+    Value: !Ref AlertsTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-AlertsTopicArn"
+
+  WeatherSecretArn:
+    Description: ARN of the Secrets Manager secret holding the OpenWeather API key.
+    Value: !Ref WeatherApiSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherSecretArn"
+
+  OperationsDashboardUrl:
+    Description: Direct link to the DayFlow CloudWatch dashboard.
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=DayFlow-Operations"

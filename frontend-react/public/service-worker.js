@@ -36,6 +36,7 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/auth") ||
     url.pathname.startsWith("/events") ||
+    url.pathname.startsWith("/tasks") ||
     url.pathname.startsWith("/briefing") ||
     url.pathname.startsWith("/users") ||
     url.pathname.startsWith("/ai") ||

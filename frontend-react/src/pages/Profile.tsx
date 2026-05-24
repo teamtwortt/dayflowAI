@@ -9,10 +9,19 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useProfile, useUpdatePreferences } from "../hooks/useProfile";
+import { decodeIdTokenClaims, displayNameFromClaims } from "../lib/idTokenClaims";
 import { useAuthStore } from "../store/auth";
 
 export default function Profile() {
   const profile = useProfile();
+  const idToken = useAuthStore((s) => s.token);
+  const tokenClaims = decodeIdTokenClaims(idToken);
+  const fallbackLabel =
+    profile.data?.name?.trim() ||
+    displayNameFromClaims(tokenClaims) ||
+    profile.data?.email?.trim() ||
+    tokenClaims.email ||
+    "";
   const update = useUpdatePreferences();
   const clearSession = useAuthStore((s) => s.clearSession);
   const navigate = useNavigate();
@@ -68,18 +77,18 @@ export default function Profile() {
       <Card className="mb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-flame-500 text-lg font-semibold text-white">
-            {(profile.data?.email || "?").slice(0, 1).toUpperCase()}
+            {(fallbackLabel || "?").slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0">
             {profile.isLoading ? (
               <Skeleton className="h-4 w-40" />
             ) : (
               <div className="truncate text-sm font-semibold">
-                {profile.data?.email}
+                {fallbackLabel || "Signed in"}
               </div>
             )}
             <div className="text-xs text-ink-300 dark:text-ink-200">
-              DayFlow AI account
+              {profile.data?.email || tokenClaims.email || "DayFlow AI account"}
             </div>
           </div>
         </div>

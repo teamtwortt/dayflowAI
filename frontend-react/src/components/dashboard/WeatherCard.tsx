@@ -9,9 +9,36 @@ interface WeatherCardProps {
   weather: Weather | undefined;
   advice?: string;
   loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
 }
 
-export function WeatherCard({ weather, advice, loading }: WeatherCardProps) {
+export function WeatherCard({
+  weather,
+  advice,
+  loading,
+  error,
+  onRetry,
+}: WeatherCardProps) {
+  if (!weather && error && !loading) {
+    return (
+      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-ink-300 dark:text-ink-200">
+          Weather couldn&apos;t load. Try again, or confirm the API is reachable.
+        </p>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="focus-ring shrink-0 rounded-xl bg-flame-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-flame-600"
+          >
+            Retry
+          </button>
+        ) : null}
+      </Card>
+    );
+  }
+
   if (loading || !weather) {
     return (
       <Card className="flex items-center justify-between">

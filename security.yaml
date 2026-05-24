@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  DayFlow AI — Security stack: continuous threat detection (GuardDuty) +
+  central findings aggregator (Security Hub) with the AWS Foundational
+  Security Best Practices (FSBP) standard.
+
+  Deployed as a SEPARATE CloudFormation stack from the application
+  (`dayflow-api`) so security telemetry survives application teardowns,
+  redeploys, or accidental ``sam delete`` runs. Per-region: deploy in
+  every region you operate in (currently just us-east-1).
+
+  Deploy:
+    aws cloudformation deploy ^
+      --template-file security.yaml ^
+      --stack-name dayflow-security ^
+      --region us-east-1 ^
+      --profile cloudsolarc ^
+      --capabilities CAPABILITY_NAMED_IAM ^
+      --no-fail-on-empty-changeset
+
+# ---------------------------------------------------------------------------
+# Parameters — small surface so you can tune cost/coverage without re-editing.
+# ---------------------------------------------------------------------------
+Parameters:
+  FindingPublishingFrequency:
+    Type: String
+    Default: SIX_HOURS
+    AllowedValues:
+      - FIFTEEN_MINUTES
+      - ONE_HOUR
+      - SIX_HOURS
+    Description: >
+      How often GuardDuty publishes new findings to EventBridge / Security Hub.
+      SIX_HOURS is the AWS default and the lowest-cost option. Drop to
+      FIFTEEN_MINUTES if you wire alerts to PagerDuty / Slack.
+
+  EnableAfsbpStandard:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Subscribe Security Hub to the AWS Foundational Security Best Practices
+      standard. Set to "false" to enable Security Hub without any standards
+      (rarely useful — most findings come from standards).
+
+Conditions:
+  AfsbpEnabled: !Equals [!Ref EnableAfsbpStandard, "true"]
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # ----- GuardDuty: continuous, ML-based threat detection -----------------
+  # Detects compromised credentials, recon traffic, crypto-mining, exfil
+  # over CloudTrail / VPC flow logs / Route 53 DNS logs at no extra setup.
+  # Free tier covers the first 30 days; after that, costs are usage-based
+  # (CloudTrail event volume + VPC flow log GB processed).
+  GuardDutyDetector:
+    Type: AWS::GuardDuty::Detector
+    Properties:
+      Enable: true
+      FindingPublishingFrequency: !Ref FindingPublishingFrequency
+      Tags:
+        - Key: Project
+          Value: DayFlow
+        - Key: Stack
+          Value: dayflow-security
+
+  # ----- Security Hub: central findings aggregator ------------------------
+  # `EnableDefaultStandards: false` keeps the Hub minimal — we explicitly
+  # subscribe to AFSBP below. This avoids accidentally enabling CIS v1.2.0
+  # (which would double the standards-charge line item).
+  SecurityHub:
+    Type: AWS::SecurityHub::Hub
+    Properties:
+      EnableDefaultStandards: false
+      ControlFindingGenerator: STANDARD_CONTROL  # consolidated findings
+      AutoEnableControls: true                    # auto-enable new controls Sec. Hub adds
+      Tags:
+        Project: DayFlow
+        Stack: dayflow-security
+
+  # ----- AWS Foundational Security Best Practices subscription -----------
+  # AFSBP is the AWS-curated baseline (~200 controls covering IAM, S3,
+  # CloudTrail, KMS, RDS, Lambda, etc). DependsOn ensures the Hub exists
+  # before we try to subscribe a standard against it.
+  AfsbpStandard:
+    Type: AWS::SecurityHub::Standard
+    Condition: AfsbpEnabled
+    DependsOn: SecurityHub
+    Properties:
+      StandardsArn: !Sub "arn:${AWS::Partition}:securityhub:${AWS::Region}::standards/aws-foundational-security-best-practices/v/1.0.0"
+
+# ---------------------------------------------------------------------------
+# Outputs — quick links + IDs for wiring into alerts later.
+# ---------------------------------------------------------------------------
+Outputs:
+  GuardDutyDetectorId:
+    Description: GuardDuty detector ID for this region (use with EventBridge rules).
+    Value: !Ref GuardDutyDetector
+    Export:
+      Name: !Sub "${AWS::StackName}-DetectorId"
+
+  SecurityHubArn:
+    Description: ARN of the Security Hub Hub resource.
+    Value: !Ref SecurityHub
+    Export:
+      Name: !Sub "${AWS::StackName}-HubArn"
+
+  AfsbpStandardSubscriptionArn:
+    Description: Subscription ARN for the AFSBP standard (only present when enabled).
+    Condition: AfsbpEnabled
+    Value: !Ref AfsbpStandard
+
+  GuardDutyConsoleUrl:
+    Description: Direct link to the GuardDuty findings page.
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/guardduty/home?region=${AWS::Region}#/findings"
+
+  SecurityHubConsoleUrl:
+    Description: Direct link to the Security Hub summary page.
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/securityhub/home?region=${AWS::Region}#/summary"

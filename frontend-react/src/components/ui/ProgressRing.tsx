@@ -31,7 +31,7 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(200,121,65,0.18)"
+          stroke="rgba(118,131,111,0.22)"
           strokeWidth={stroke}
         />
         <circle
@@ -39,7 +39,7 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#c87941"
+          stroke="#76836f"
           strokeWidth={stroke}
           strokeDasharray={circumference}
           strokeDashoffset={offset}

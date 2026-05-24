@@ -25,12 +25,12 @@ export function TrafficCard() {
             <polyline
               points="0,28 12,22 24,18 36,10 52,4"
               fill="none"
-              stroke="#c87941"
+              stroke="#76836f"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <circle cx="52" cy="4" r="3" fill="#c87941" />
+            <circle cx="52" cy="4" r="3" fill="#76836f" />
           </svg>
         </div>
       </Card>
