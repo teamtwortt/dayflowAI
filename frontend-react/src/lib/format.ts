@@ -32,6 +32,16 @@ export function startsWithToday(iso: string): boolean {
   return iso.startsWith(today);
 }
 
+/** Profile `briefing_time` is stored as 24h "HH:mm". */
+export function formatBriefingTime(time24: string): string {
+  const [hStr, mStr = "00"] = time24.split(":");
+  const h = Number.parseInt(hStr ?? "7", 10);
+  if (Number.isNaN(h)) return time24;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${mStr} ${ampm}`;
+}
+
 export function getGreeting(): { title: string; sub: string } {
   const h = new Date().getHours();
   if (h < 12) {

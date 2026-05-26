@@ -1,23 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { FocusCard } from "../components/dashboard/FocusCard";
-import { QuickActions } from "../components/dashboard/QuickActions";
+import {
+  QuickActions,
+  type QuickActionId,
+} from "../components/dashboard/QuickActions";
 import { EventList } from "../components/dashboard/EventList";
 import { EventModal } from "../components/dashboard/EventModal";
+import { TaskList } from "../components/dashboard/TaskList";
+import { TaskModal } from "../components/dashboard/TaskModal";
+import { RemindersSummary } from "../components/dashboard/RemindersSummary";
 import { AIQuickAdd } from "../components/dashboard/AIQuickAdd";
 import { WeatherCard } from "../components/dashboard/WeatherCard";
 import { TrafficCard } from "../components/dashboard/TrafficCard";
 import { Greeting } from "../components/dashboard/Greeting";
 import { SectionHeader } from "../components/dashboard/SectionHeader";
 import { useEvents } from "../hooks/useEvents";
+import { useTasks } from "../hooks/useTasks";
 import { useBriefing } from "../hooks/useBriefing";
 import { useAddEventTrigger } from "../components/layout/addEventContext";
 import { useProfile } from "../hooks/useProfile";
 import { startsWithToday } from "../lib/format";
 import { decodeIdTokenClaims, displayNameFromClaims } from "../lib/idTokenClaims";
 import { useAuthStore } from "../store/auth";
-import type { DayflowEvent } from "../api/types";
+import type { DayflowEvent, DayflowTask } from "../api/types";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -33,28 +40,48 @@ export default function Dashboard() {
     authEmail?.split("@")[0];
 
   const events = useEvents();
+  const tasksQuery = useTasks();
   const briefing = useBriefing();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<DayflowEvent | null>(null);
+  const [panel, setPanel] = useState<QuickActionId>("schedule");
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<DayflowEvent | null>(null);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<DayflowTask | null>(null);
   const { openTrigger } = useAddEventTrigger();
 
   useEffect(() => {
     if (openTrigger > 0) {
-      setEditing(null);
-      setModalOpen(true);
+      setPanel("schedule");
+      setEditingEvent(null);
+      setEventModalOpen(true);
     }
   }, [openTrigger]);
 
   const todays = (events.data ?? []).filter((e) => startsWithToday(e.datetime));
 
-  function openCreate() {
-    setEditing(null);
-    setModalOpen(true);
+  const openTasks = useMemo(
+    () => (tasksQuery.data ?? []).filter((t) => !t.completed),
+    [tasksQuery.data],
+  );
+
+  function openCreateEvent() {
+    setEditingEvent(null);
+    setEventModalOpen(true);
   }
 
-  function openEdit(event: DayflowEvent) {
-    setEditing(event);
-    setModalOpen(true);
+  function openEditEvent(event: DayflowEvent) {
+    setEditingEvent(event);
+    setEventModalOpen(true);
+  }
+
+  function openCreateTask() {
+    setEditingTask(null);
+    setTaskModalOpen(true);
+  }
+
+  function openEditTask(task: DayflowTask) {
+    setEditingTask(task);
+    setTaskModalOpen(true);
   }
 
   return (
@@ -69,20 +96,50 @@ export default function Dashboard() {
 
       <AIQuickAdd />
 
-      <QuickActions />
+      <QuickActions value={panel} onChange={setPanel} />
 
-      <SectionHeader
-        title="Today's plan"
-        onViewAll={() => navigate("/plan")}
-        onAdd={openCreate}
-      />
+      {panel === "schedule" ? (
+        <>
+          <SectionHeader
+            title="Today's plan"
+            onViewAll={() => navigate("/plan")}
+            onAdd={openCreateEvent}
+          />
+          <EventList
+            events={todays}
+            loading={events.isLoading}
+            onEventClick={openEditEvent}
+            emptyMessage="Nothing on the calendar today — use the box above or tap + to add an event."
+          />
+        </>
+      ) : null}
 
-      <EventList
-        events={todays}
-        loading={events.isLoading}
-        onEventClick={openEdit}
-        emptyMessage="Nothing on the calendar today — use the box above or tap + to add an event."
-      />
+      {panel === "tasks" ? (
+        <>
+          <SectionHeader
+            title="Open tasks"
+            onViewAll={() => navigate("/tasks")}
+            onAdd={openCreateTask}
+            addLabel="Add task"
+          />
+          <TaskList
+            tasks={openTasks}
+            loading={tasksQuery.isLoading}
+            onTaskClick={openEditTask}
+            emptyMessage="No open tasks — tap Add task or use View all."
+          />
+        </>
+      ) : null}
+
+      {panel === "reminders" ? (
+        <>
+          <SectionHeader title="Reminders" />
+          <RemindersSummary
+            preferences={profile.data?.preferences}
+            loading={profile.isLoading}
+          />
+        </>
+      ) : null}
 
       <div className="mt-5 space-y-3">
         <TrafficCard />
@@ -96,9 +153,15 @@ export default function Dashboard() {
       </div>
 
       <EventModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        event={editing}
+        open={eventModalOpen}
+        onClose={() => setEventModalOpen(false)}
+        event={editingEvent}
+      />
+
+      <TaskModal
+        open={taskModalOpen}
+        onClose={() => setTaskModalOpen(false)}
+        task={editingTask}
       />
     </div>
   );

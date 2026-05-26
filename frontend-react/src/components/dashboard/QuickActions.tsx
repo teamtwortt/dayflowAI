@@ -1,27 +1,30 @@
-import { Bell, CalendarDays, CheckSquare, Heart, MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { Bell, CalendarDays, CheckSquare } from "lucide-react";
 
 import { cn } from "../../lib/cn";
 
-const actions = [
+export type QuickActionId = "schedule" | "tasks" | "reminders";
+
+const actions: { id: QuickActionId; label: string; Icon: typeof CalendarDays }[] = [
   { id: "schedule", label: "Schedule", Icon: CalendarDays },
   { id: "tasks", label: "Tasks", Icon: CheckSquare },
   { id: "reminders", label: "Reminders", Icon: Bell },
-  { id: "wellness", label: "Wellness", Icon: Heart },
-  { id: "more", label: "More", Icon: MoreHorizontal },
 ];
 
-export function QuickActions() {
-  const [active, setActive] = useState("schedule");
+interface QuickActionsProps {
+  value: QuickActionId;
+  onChange: (id: QuickActionId) => void;
+}
 
+export function QuickActions({ value, onChange }: QuickActionsProps) {
   return (
     <div className="mb-6 flex gap-2 overflow-x-auto pb-1">
       {actions.map(({ id, label, Icon }) => {
-        const isActive = id === active;
+        const isActive = id === value;
         return (
           <button
             key={id}
-            onClick={() => setActive(id)}
+            type="button"
+            onClick={() => onChange(id)}
             className={cn(
               "flex shrink-0 flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition-all",
               "min-w-[68px]",
