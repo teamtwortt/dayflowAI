@@ -1,8 +1,11 @@
+import { cn } from "../../lib/cn";
+
 interface ProgressRingProps {
   value: number; // 0..1
   size?: number;
   stroke?: number;
   label?: string;
+  labelClassName?: string;
 }
 
 export function ProgressRing({
@@ -10,6 +13,7 @@ export function ProgressRing({
   size = 48,
   stroke = 3,
   label,
+  labelClassName,
 }: ProgressRingProps) {
   const safe = Math.max(0, Math.min(1, value));
   const radius = (size - stroke) / 2;
@@ -31,7 +35,7 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(118,131,111,0.22)"
+          stroke="rgba(247,247,245,0.2)"
           strokeWidth={stroke}
         />
         <circle
@@ -39,7 +43,7 @@ export function ProgressRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#76836f"
+          stroke="#c5d0c0"
           strokeWidth={stroke}
           strokeDasharray={circumference}
           strokeDashoffset={offset}
@@ -47,7 +51,12 @@ export function ProgressRing({
           style={{ transition: "stroke-dashoffset 0.5s ease" }}
         />
       </svg>
-      <span className="absolute text-[0.72rem] font-semibold text-flame-500">
+      <span
+        className={cn(
+          "absolute text-[0.72rem] font-semibold text-flame-500",
+          labelClassName,
+        )}
+      >
         {label ?? `${Math.round(safe * 100)}%`}
       </span>
     </div>

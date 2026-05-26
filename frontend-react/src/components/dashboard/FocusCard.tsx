@@ -22,24 +22,24 @@ export function FocusCard({ events, loading }: FocusCardProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.05 }}
-      className="mb-5 flex items-center justify-between rounded-2xl bg-ink-500 px-5 py-4 text-ink-50 shadow-soft dark:bg-cream-400 dark:text-ink-700"
+      className="mb-5 flex items-center justify-between rounded-2xl bg-ink-600 px-5 py-4 text-ink-50 shadow-soft"
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-flame-500/25">
-          <Star size={18} className="text-flame-300" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-flame-500/30">
+          <Star size={18} className="text-flame-100" aria-hidden />
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-flame-300">
+          <div className="text-xs font-semibold uppercase tracking-wider text-flame-100">
             Today's focus
           </div>
           {loading ? (
-            <Skeleton className="mt-1 h-4 w-40" />
+            <Skeleton className="mt-1 h-4 w-40 bg-ink-500/60" />
           ) : (
-            <div className="mt-0.5 text-base font-semibold">
+            <div className="mt-0.5 text-base font-semibold text-ink-50">
               {focus ? focus.title : "Nothing scheduled"}
             </div>
           )}
-          <div className="mt-0.5 text-sm text-flame-300">
+          <div className="mt-0.5 text-sm text-ink-100">
             {todays.length} {todays.length === 1 ? "event" : "events"} today
           </div>
         </div>
@@ -48,6 +48,7 @@ export function FocusCard({ events, loading }: FocusCardProps) {
       <ProgressRing
         value={progress}
         label={`${completedToday}/${Math.max(todays.length, 0)}`}
+        labelClassName="text-ink-50"
       />
     </motion.div>
   );
