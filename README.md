@@ -12,17 +12,16 @@ DayFlow AI unifies smart event management, weather-aware recommendations, automa
 
 ```
 dayflowAI/
-├── backend/          # FastAPI app (Lambda-ready via Mangum)
-├── frontend-react/   # React + TypeScript + Vite + Tailwind
-├── frontend/         # Legacy HTML/JS prototype (reference)
-├── routes/             # Legacy Flask routes (reference)
-├── services/         # Legacy Flask services (reference)
-├── middleware/       # Legacy Flask auth guard (reference)
-├── app.py              # Legacy Flask entrypoint (reference)
+├── backend/          
+├── frontend-react/   
+├── frontend/         
+├── routes/          
+├── services/        
+├── middleware/      
+├── app.py            
 └── README.md
 ```
 
-The **`backend/`** and **`frontend-react/`** folders are the production targets. Root-level Flask code is kept as reference.
 
 ---
 
@@ -71,7 +70,7 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
-cp .env.example .env       # fill in Cognito + Weather keys
+cp .env.example .env       # insert your Cognito + Weather keys
 uvicorn main:app --reload  # http://localhost:8000  ·  /docs
 ```
 
@@ -83,7 +82,6 @@ npm install
 npm run dev   # http://localhost:5173
 ```
 
-The Vite dev server can proxy API requests to FastAPI locally — see `frontend-react/vite.config.ts`.
 
 ---
 
@@ -112,18 +110,6 @@ OpenAPI: `http://localhost:8000/docs` when the backend is running.
 
 ---
 
-## Deployment
-
-### Frontend → AWS Amplify
-
-1. Connect the repo in the Amplify console.
-2. Use `frontend-react/amplify.yml` as the build spec.
-3. Set `VITE_API_BASE_URL = https://<api-gateway-url>` (no trailing slash).
-4. Deploy.
-
-### Backend → AWS Lambda + API Gateway
-
-Deploy with **AWS SAM** using `template.yaml` at repo root (`sam build && sam deploy`). Handler: `lambda_handler.handler` in `backend/`.
 
 ### Required AWS resources
 
@@ -135,9 +121,6 @@ Deploy with **AWS SAM** using `template.yaml` at repo root (`sam build && sam de
 
 ---
 
-## Design tokens
-
-Warm editorial palette — see `frontend-react/tailwind.config.ts`.
 
 ---
 
